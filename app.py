@@ -10,9 +10,9 @@ import cv2
 app = Flask(__name__)
 
 # Load your trained model
-model = load_model("face_recognition_model_2.keras")
+model = load_model("face_recognition_model_4.keras")
 
-with open("label_encoder.pkl", "rb") as f:
+with open("label_encoder_2.pkl", "rb") as f:
     label_encoder = pickle.load(f)
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
