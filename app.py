@@ -30,9 +30,9 @@ UIB_LONG = 104.00328410332459
 waktu_masuk = time(8,0)
 waktu_pulang = time(17,0)
 # Load your trained model
-model = load_model("face_recognition_model_4.keras")
+model = load_model("face_recognitionV10.keras")
 
-with open("label_encoder_2.pkl", "rb") as f:
+with open("label_encoder_4.pkl", "rb") as f:
     label_encoder = pickle.load(f)
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -81,16 +81,16 @@ def preprocess_image(image):
     face = image_cv[y:y+h, x:x+w]
     
     # Resize the cropped face to the model input size
-    face_resized = cv2.resize(face, (160, 160))
+    face_resized = cv2.resize(face, (200, 200))
     
     # Normalize pixel values
     face_normalized = face_resized / 255.0
     
     # Add batch dimension
     face_batch = np.expand_dims(face_normalized, axis=0)
-    plt.imshow(face_batch[0])  # Show the first (and only) image in the batch
-    plt.axis("off")  # Turn off axis for better visualization
-    plt.show()
+    # plt.imshow(face_batch[0])  # Show the first (and only) image in the batch
+    # plt.axis("off")  # Turn off axis for better visualization
+    # plt.show()
     return face_batch
 
 def decode_base64_image(base64_string):
@@ -108,20 +108,46 @@ def recognize_face(base64_image):
     """
     # Decode Base64 to image
     image = decode_base64_image(base64_image)
-
-    # Preprocess the image
+    
     processed_image = preprocess_image(image)
     
     # Predict using the model
     predictions = model.predict(processed_image)
 
-    predicted_class = np.argmax(predictions)  # Get the class ID
+    # predicted_class = np.argmax(predictions)  # Get the class ID
     
+    # predicted_label = label_encoder.inverse_transform([predicted_class])[0]
 
-    # Convert index to label
-    predicted_label = label_encoder.inverse_transform([predicted_class])[0]
+    predicted_probabilities = predictions[0]  # Assuming batch size of 1
 
-    return predicted_label
+    print(predicted_probabilities)
+
+    predicted_indices = np.where(predicted_probabilities >= 0.5)[0]
+
+    print(predicted_indices)
+    # Filter predictions with confidence >= 95%
+    if len(predicted_indices) > 0:
+        # Get the highest confidence prediction
+        highest_index = predicted_indices[np.argmax(predicted_probabilities[predicted_indices])]
+
+        print(highest_index)
+
+        highest_confidence = predicted_probabilities[highest_index]
+
+        print(highest_confidence)
+
+        predicted_label = label_encoder.inverse_transform([highest_index])[0]
+        
+        print(f"Predicted Label: {predicted_label}")
+        print(f"Confidence: {highest_confidence * 100:.2f}%")
+
+        return predicted_label
+    else:
+        print("No predictions with confidence >= 95%.")
+        
+        return False
+
+    # return predicted_label
 
 
 # Route to render login page
@@ -287,16 +313,16 @@ def capture_face():
     distance = haversine_distance(UIB_LAT, UIB_LONG, lat, long)
 
     # Check if within 300 meters
-    if distance <= 300:
-        print(f"Within 300 meters. Distance: {distance:.2f} meters")
+    # if distance <= 300:
+    print(f"Within 300 meters. Distance: {distance:.2f} meters")
+
+    if not base64_image:
+        return jsonify({"error": "No image provided"}), 400
     
-        if not base64_image:
-            return jsonify({"error": "No image provided"}), 400
-        
-        person_id = recognize_face(base64_image)
-        return jsonify({"success" : True,"id": person_id})
-    else:
-        return jsonify({"error": "You Are Too Far"}), 400
+    person_id = recognize_face(base64_image)
+    return jsonify({"success" : True,"id": person_id})
+    # else:
+    #     return jsonify({"error": "You Are Too Far"}), 400
 
 
 @app.route('/api/token_attendance', methods=['POST'])

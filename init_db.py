@@ -58,7 +58,7 @@ data = [
   ('1200005', 'Patrick Pratama Hendri', 'Not Attended', '1200005.patrick@email.com', 'zedkxdrnfplsuchj'),
   ('5220015', 'Sandy Putra Efendi', 'Not Attended', '5220015.sandy@email.com', 'fnbxucrruuqsozmu'),
   ('5220021', 'Sandy Alferro Dion', 'Not Attended', '5220021.sandy@email.com', 'ygebkxnuemntwhkf'),
-  ('7180066', 'Herman', 'Not Attended', '7180066.herman@email.com', 'hkcywyqiiujdfjnm'),
+  ('07180066', 'Herman', 'Not Attended', '7180066.herman@email.com', 'hkcywyqiiujdfjnm'),
   ('2231002', 'Jetset', 'Not Attended', '2231002.jetset@email.com', 'xdthygofxlxaqnew'),
   ('2231061', 'Erwin', 'Not Attended', '2231061.erwin@email.com', 'ecdnjcjaicqdwqaj'),
   ('2231064', 'Fernando Jose', 'Not Attended', '2231064.fernando@email.com', 'hqbqfjfzjjzzjepz'),
@@ -85,7 +85,7 @@ data = [
   ('2231163', 'Stanley', 'Not Attended', '2231163.stanley@email.com', 'nqqmpffxgzpmptzj'),
   ('2231198', 'Fajar Anugrah', 'Not Attended', '2231198.fajar@email.com', 'bbgzvaxnsinyefvt'),
   ('2231206', 'Kelvin Tang', 'Not Attended', '2231206.kelvin@email.com', 'kmuzoqckcmsotuih'),
-  ('3170028', 'Wike Orize', 'Not Attended', '3170028.wike@email.com', 'sqmvpdexbaizokyv'),
+  ('03170028', 'Wike Orize', 'Not Attended', '3170028.wike@email.com', 'sqmvpdexbaizokyv'),
   ('09200101', 'Abdurrakhman Alhakim', 'Not Attended', '09200101.abdurrakhman@email.com', 'qbomdmuwxtgguzut')
 ]
 
