@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify,redirect, url_for, session
+from flask import Flask, render_template, request, jsonify,redirect, url_for, session, send_file
 import base64
 import psycopg2
 import numpy as np
@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, time
 from flask_bcrypt import Bcrypt
 import bcrypt
 from collections import Counter
-
+import openpyxl
+import io
 app = Flask(__name__)
 app.secret_key = 'uib_ai_recog'  # Use a strong secret key
 # bcrypt = Bcrypt(app)
@@ -30,9 +31,9 @@ UIB_LONG = 104.00328410332459
 waktu_masuk = time(8,0)
 waktu_pulang = time(17,0)
 # Load your trained model
-model = load_model("face_recognitionV10.keras")
+model = load_model("face_recognitionV12.keras")
 
-with open("label_encoder_4.pkl", "rb") as f:
+with open("label_encoder_5.pkl", "rb") as f:
     label_encoder = pickle.load(f)
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -122,7 +123,7 @@ def recognize_face(base64_image):
 
     print(predicted_probabilities)
 
-    predicted_indices = np.where(predicted_probabilities >= 0.5)[0]
+    predicted_indices = np.where(predicted_probabilities >= 0.85)[0]
 
     print(predicted_indices)
     # Filter predictions with confidence >= 95%
@@ -161,27 +162,34 @@ def login():
     email = request.form['email']
     passwords = request.form['password']
 
-    # Connect to the database
-    conn = get_db_connection()
-    cur = conn.cursor()
+    try:
+        # Connect to the database
+        conn = get_db_connection()
+        if conn is None:
+            return jsonify({'error': 'Database connection error'}), 500
 
-    # Query the user
-    cur.execute("SELECT * FROM admin WHERE email = %s", (email,))
-    user = cur.fetchone()
-    cur.close()
-    conn.close()
+        cur = conn.cursor()
 
-    print("password", passwords.encode('utf-8'))
-    print("password", user[2].encode('utf-8'))
-    # Validate user credentials
-    if not user or not bcrypt.checkpw(passwords.encode('utf-8'), user[2].encode('utf-8')):
-        return jsonify({'error': 'Invalid Email or password'}), 401
+        # Query the user
+        cur.execute("SELECT * FROM admin WHERE email = %s", (email,))
+        user = cur.fetchone()
 
-    # Save user session
-    session['user_id'] = user[0]
-    session['username'] = user[1]
-    session['email'] = user[3]
-    return redirect(url_for('index'))
+        cur.close()
+        conn.close()
+
+        # Validate user credentials
+        if not user or not bcrypt.checkpw(passwords.encode('utf-8'), user[2].encode('utf-8')):
+            return render_template('login.html', error_message='Invalid email or password')
+
+        # Save user session
+        session['user_id'] = user[0]
+        session['username'] = user[1]
+        session['email'] = user[3]
+        return redirect(url_for('index'))
+
+    except Exception as e:
+        print("Error:", e)
+        return render_template('login.html', error_message='An error occurred, please try again later')
 
 # Logout route
 @app.route('/logout', methods=['GET'])
@@ -218,7 +226,9 @@ def post_take_attendance():
         return jsonify({'error' : "Attedance Status Is Invalid, Please Check With IT Team"})
     conn = get_db_connection()
     cur = conn.cursor()
-
+    
+    print("karyawan_id", karyawan_id)
+    print("current_attendance", attendance_status)
     if attendance_status == "Not Attended":
         cur.execute("UPDATE karyawan set status = 'Attended' where npm = %s;", (karyawan_id,))
         cur.execute("INSERT INTO absensi (karyawan_id, waktu_masuk, status) VALUES (%s,%s,%s);", (karyawan_id,now,'Masuk'))
@@ -238,7 +248,8 @@ def post_take_attendance():
     # karyawan = cur.fetchall()
     # image_base64 = base64.b64encode(karyawan[0][2].tobytes()).decode('utf-8')
     
-    return jsonify({"sucesss" : True})
+    print("im here")
+    return jsonify({"success" : True})
 
 @app.route('/')
 def index():
@@ -320,7 +331,22 @@ def capture_face():
         return jsonify({"error": "No image provided"}), 400
     
     person_id = recognize_face(base64_image)
-    return jsonify({"success" : True,"id": person_id})
+
+    if not person_id:
+        return jsonify({"success" : False})
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM karyawan where npm = %s;", (person_id,))
+    karyawan_id = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    is_admin = False
+    if session.get('user_id'):
+        is_admin = True
+
+    return jsonify({"success" : True,"id":karyawan_id[0][0], "name":karyawan_id[0][4], "email":karyawan_id[0][3], "status":karyawan_id[0][1], "is_admin":is_admin})
     # else:
     #     return jsonify({"error": "You Are Too Far"}), 400
 
@@ -353,3 +379,46 @@ def token_attendance():
     return jsonify({"success" : True,"id": karyawan_id[0][0]})
     # else:
     #     return jsonify({"error": "You Are Too Far"}), 400
+
+
+
+@app.route('/report/export', methods=['GET'])
+def export_to_excel():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Attendance Records"
+
+    # Write header
+    headers = ["#", "NPM", "Name", "Waktu Masuk", "Waktu Keluar", "Status"]
+    ws.append(headers)
+
+    now = datetime.now()
+    start_time = datetime.combine(now.date(), datetime.min.time())
+    end_time = datetime.combine(now.date(), datetime.max.time())
+
+     # Get the search query from the request
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT absensi.*, karyawan.nama FROM absensi
+        JOIN karyawan ON absensi.karyawan_id = karyawan.npm
+        WHERE (waktu_masuk >= %s OR waktu_keluar <= %s);
+    """, (start_time, end_time))
+    absen_ids = cur.fetchall()
+    cur.close()
+    conn.close()
+    # Write data
+    for idx, record in enumerate(absen_ids, start=1):
+        ws.append([idx, record[1], record[5], record[2] or "-", record[3] or "-", record[4]])
+
+    # Save to an in-memory buffer
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Send the Excel file as a response
+    return send_file(output,
+                     as_attachment=True,
+                     download_name="attendance_records.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

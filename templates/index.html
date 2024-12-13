@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Responsive Sidebar</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <style>
     /* Basic Reset */
     * {
@@ -197,7 +199,6 @@
         <!-- <device type="media" onchange="update(this.data)"></device> -->
 
     </div>
-
     <!-- Add a canvas element for capturing the frame (hidden by default) -->
     <canvas id="captureCanvas" width="400" height="200"></canvas>
 
@@ -213,6 +214,7 @@
         const canvas = document.getElementById("captureCanvas");
         let lat = 0;
         let long = 0;
+        
         function getLocation() {
           return new Promise((resolve, reject) => {
               if (!navigator.geolocation) {
@@ -325,11 +327,83 @@
                 .then(data => {
                     // Redirect to confirmation page with the returned data (use URL parameters)
                     if (data.success) {
-                        const { id } = data;  // Assuming the backend returns these
-                        const redirectUrl = `/confirmation?id=${id}`;
-                        window.location.href = redirectUrl;  // Redirect to confirmation page
+                        // const { id } = data;  // Assuming the backend returns these
+                        // const redirectUrl = `/confirmation?id=${id}`;
+                        // window.location.href = redirectUrl;  // Redirect to confirmation page
+                        console.log("data success")
+                        let timerInterval;
+                        Swal.fire({
+                          title: "Attendance Confirmation",
+                          html: `
+                          <input type="text" id="input1" class="swal2-input" readonly>
+                          <input type="text" id="input2" class="swal2-input" readonly>
+                          <input type="text" id="input3" class="swal2-input" readonly>
+                          <input type="text" id="input4" class="swal2-input" readonly>
+                          `,
+                          showCancelButton: true,
+                          confirmButtonText: "Yes, Confirm",
+                          cancelButtonText: "No, Cancel",
+                          didOpen: () => {
+                            document.getElementById("input1").value = data.id; // Example value from your response
+                            document.getElementById("input2").value = data.name;
+                            document.getElementById("input3").value = data.email;
+                            document.getElementById("input4").value = data.status;
+                          },
+                        }).then((result) => {
+                          /* Read more about handling dismissals below */
+                          if (result.isConfirmed) {
+                              // If user confirms, send the attendance
+                              fetch("/take_attendance", {
+                                  method: "POST",
+                                  headers: {
+                                      "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                      id: data.id,
+                                      status: data.status,
+                                  }),
+                              })
+                                  .then((response) => response.json())
+                                  .then((attendanceData) => {
+                                      console.log(attendanceData)
+                                      if (attendanceData.success) {
+                                          Swal.fire({
+                                              title: "Attendance Confirmed!",
+                                              text: "Your attendance has been successfully recorded.",
+                                              icon: "success",
+                                          });
+                                      } else {
+                                          Swal.fire({
+                                              title: "Error",
+                                              text: "Unable to record attendance. Please try again.",
+                                              icon: "error",
+                                          });
+                                      }
+                                  })
+                                  .catch((error) => {
+                                      console.error("Error:", error);
+                                      Swal.fire({
+                                          title: "Error",
+                                          text: "Something went wrong.",
+                                          icon: "error",
+                                      });
+                                  });
+                          } else {
+                              // If the user cancels
+                              Swal.fire({
+                                  title: "Cancelled",
+                                  text: "Attendance not recorded.",
+                                  icon: "info",
+                              });
+                          }
+                        });
                     } else {
-                        console.error("Error:", data.error);
+                        // console.error("Error:", data.error);
+                        Swal.fire({
+                          title:"Error!",
+                          text: "No Data Is Found",
+                          icon: "danger",
+                        });
                     }
               });
             }
